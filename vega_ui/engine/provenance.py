@@ -66,12 +66,29 @@ def annotate_spec(spec: dict[str, Any]) -> dict[str, Any]:
 
 def strip_provenance(spec: dict[str, Any]) -> dict[str, Any]:
     """Return a clean Vega-Lite spec with editor metadata removed."""
-    spec = copy.deepcopy(spec)
-    usermeta = spec.get(USERMETA_KEY, {})
-    usermeta.pop(EDITOR_META_KEY, None)
-    if not usermeta:
-        spec.pop(USERMETA_KEY, None)
-    return spec
+    def _strip(node: Any) -> Any:
+        if isinstance(node, list):
+            return [_strip(item) for item in node]
+
+        if isinstance(node, dict):
+            cleaned: dict[str, Any] = {}
+            for key, value in node.items():
+                if key == USERMETA_KEY and isinstance(value, dict):
+                    usermeta = {
+                        nested_key: _strip(nested_value)
+                        for nested_key, nested_value in value.items()
+                        if nested_key != EDITOR_META_KEY
+                    }
+                    if usermeta:
+                        cleaned[key] = usermeta
+                    continue
+
+                cleaned[key] = _strip(value)
+            return cleaned
+
+        return copy.deepcopy(node)
+
+    return _strip(spec)
 
 
 def get_object_ids(spec: dict[str, Any]) -> dict[str, str]:

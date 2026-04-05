@@ -1,5 +1,6 @@
 """Tests for the provenance module."""
 
+from vega_ui.engine.mutation import add_annotation
 from vega_ui.engine.provenance import annotate_spec, get_object_ids, strip_provenance
 
 
@@ -47,6 +48,16 @@ def test_strip_preserves_other_usermeta(bar_spec):
     stripped = strip_provenance(annotated)
     assert stripped["usermeta"]["custom_key"] == "keep_this"
     assert "editor" not in stripped["usermeta"]
+
+
+def test_strip_removes_nested_annotation_metadata(bar_spec):
+    annotated = annotate_spec(bar_spec)
+    layered, _ = add_annotation(annotated, "Threshold", x_value="A", y_value=50)
+
+    stripped = strip_provenance(layered)
+
+    assert "usermeta" not in stripped
+    assert "usermeta" not in stripped["layer"][1]
 
 
 def test_annotate_idempotent(bar_spec):

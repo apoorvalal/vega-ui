@@ -1,43 +1,44 @@
-"""FastAPI application factory and entry point."""
+"""Application factory and entry point."""
 
 from __future__ import annotations
 
-from pathlib import Path
+import os
 
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 
 from vega_ui.routes import charts, export, mutations
 from vega_ui.store import SessionStore
+from vega_ui.ui import create_ui_app
 
-FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
+
+def _normalize_base_path(base_path: str) -> str:
+    base = base_path.strip()
+    if not base:
+        return ""
+    if not base.startswith("/"):
+        base = f"/{base}"
+    return base.rstrip("/")
 
 
-def create_app() -> FastAPI:
+def create_app(base_path: str | None = None) -> FastAPI:
     """Create and configure the FastAPI application."""
+    resolved_base_path = _normalize_base_path(
+        os.getenv("VEGA_UI_BASE_PATH", "") if base_path is None else base_path
+    )
     app = FastAPI(
         title="Vega-Altair WYSIWYG Editor",
         description="Stage A presentation editor for Vega-Lite / Altair charts",
         version="0.1.0",
+        root_path=resolved_base_path,
     )
 
-    # CORS for dev (Vite dev server on :5173)
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-
-    # Shared session store
+    # Shared session store for API and UI
     session_store = SessionStore()
     charts.store = session_store
     mutations.store = session_store
     export.store = session_store
 
-    # API routes
+    # JSON API
     app.include_router(charts.router)
     app.include_router(mutations.router)
     app.include_router(export.router)
@@ -47,21 +48,8 @@ def create_app() -> FastAPI:
         """Health endpoint for local verification."""
         return {"status": "ok"}
 
-    if not FRONTEND_DIST.is_dir():
-        @app.get("/")
-        def root() -> dict[str, str]:
-            """Explain how to run the frontend when no build is present."""
-            return {
-                "message": (
-                    "Frontend build not found. Run `cd frontend && npm run dev` for local "
-                    "development, or `cd frontend && npm run build` and restart the backend "
-                    "to serve the built UI from FastAPI."
-                )
-            }
-
-    # Serve frontend static files if built
-    if FRONTEND_DIST.is_dir():
-        app.mount("/", StaticFiles(directory=str(FRONTEND_DIST), html=True), name="frontend")
+    # Server-rendered FastHTML UI
+    app.mount("/", create_ui_app(session_store, base_path=resolved_base_path))
 
     return app
 
@@ -72,4 +60,9 @@ app = create_app()
 def run() -> None:
     """CLI entry point: ``vega-ui``."""
     import uvicorn
-    uvicorn.run("vega_ui.app:app", host="127.0.0.1", port=8000, reload=True)
+
+    host = os.getenv("HOST", "127.0.0.1")
+    port = int(os.getenv("PORT", "8000"))
+    reload_enabled = os.getenv("VEGA_UI_RELOAD", "").lower() in {"1", "true", "yes", "on"}
+
+    uvicorn.run("vega_ui.app:app", host=host, port=port, reload=reload_enabled)

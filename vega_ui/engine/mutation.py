@@ -136,6 +136,22 @@ def _make_mark_setter(field: str):
     return setter
 
 
+def _set_mark_color(spec: dict, value: Any) -> None:
+    encoding = spec.get("encoding", {})
+    color_channel = encoding.get("color")
+    if isinstance(color_channel, dict):
+        if "field" in color_channel:
+            raise MutationError(
+                "Color is controlled by encoding.color.field. "
+                "Direct mark color edits only support constant-color charts."
+            )
+        if "value" in color_channel:
+            color_channel["value"] = value
+            return
+
+    _make_mark_setter("color")(spec, value)
+
+
 def _make_axis_setter(channel: str, field: str):
     def setter(spec: dict, value: Any) -> None:
         axis = _ensure_axis(spec, channel)
@@ -160,7 +176,8 @@ for _field in ("width", "height", "background", "padding"):
     _MUTATIONS[f"chart.{_field}"] = _make_chart_setter(_field)
 
 # Mark-level
-for _field in ("color", "fill", "stroke", "opacity", "strokeWidth", "size",
+_MUTATIONS["mark.color"] = _set_mark_color
+for _field in ("fill", "stroke", "opacity", "strokeWidth", "size",
                "fillOpacity", "strokeOpacity"):
     _MUTATIONS[f"mark.{_field}"] = _make_mark_setter(_field)
 
@@ -350,8 +367,20 @@ def apply_mutation(
         )
 
     new_spec = copy.deepcopy(spec)
+    mutation_root = new_spec
+    if (
+        "layer" in new_spec
+        and isinstance(new_spec["layer"], list)
+        and new_spec["layer"]
+        and target.startswith(("mark.", "axis.", "legend."))
+    ):
+        base_layer = new_spec["layer"][0]
+        if not isinstance(base_layer, dict):
+            raise MutationError("Layered spec is malformed")
+        mutation_root = base_layer
+
     try:
-        mutator(new_spec, value)
+        mutator(mutation_root, value)
     except MutationError:
         raise
     except Exception as exc:

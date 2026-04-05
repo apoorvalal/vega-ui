@@ -1,29 +1,110 @@
 # Vega UI
 
-Vega UI is a Stage A Vega-Lite / Altair editor split into a Python backend and a TypeScript frontend.
+Vega UI is a Python-only Stage A Vega-Lite / Altair presentation editor. The browser UI is rendered with FastHTML, the JSON API stays on FastAPI, and chart previews are rendered server-side with `vl-convert-python`. There is no Node, Vite, or client bundle to install or debug.
 
-The canonical repository layout is:
+## Why This Stack
 
-- [`vega_ui`](/home/alal/Desktop/code/viz/vega-ui/vega_ui): FastAPI backend, ingestion, validation, provenance, mutation engine, exports, and in-memory session store
-- [`frontend`](/home/alal/Desktop/code/viz/vega-ui/frontend): Vite frontend for rendering charts, selection, property panels, annotations, export actions, and client-side state
-- [`tests`](/home/alal/Desktop/code/viz/vega-ui/tests): Python backend tests
+The previous frontend stack added a second runtime, a second dependency graph, and a second failure surface for a tool whose editing model is already constrained and form-oriented. The current implementation keeps the useful parts and removes the accidental complexity:
 
-This repo previously contained a second incompatible implementation under `src/vega_ui_app`. That duplicate stack has been removed so the codebase now matches the tested `vega_ui` + `frontend` architecture.
+- FastHTML for the UI because the editor is mostly forms, previews, and session links
+- FastAPI for the existing typed JSON API and testable route layer
+- the existing Python mutation engine for ingestion, provenance, validation, undo, annotations, and exports
+- `vl-convert-python` for server-side SVG previews so the browser does not need Vega runtime code
 
-## What It Does
+That gives the repo one install path, one app process, and one place where chart mutations happen.
 
-Current Stage A scope:
+## What The App Does
 
-- ingest Vega-Lite specs through the backend
-- validate and normalize supported charts
-- annotate specs with editor provenance
-- expose chart sessions over HTTP
-- apply constrained presentation-layer mutations
-- support add, update, remove, and undo for annotations
+Current supported Stage A workflow:
+
+- paste a Vega-Lite spec into the loader page
+- create an editing session backed by the in-memory session store
+- change chart title, subtitle, size, and background
+- change mark styling such as color, stroke, opacity, stroke width, and size
+- change axis titles and label font sizes
+- apply custom supported mutations through the existing mutation target list
+- add and remove text annotations
+- undo the last change
 - export clean Vega-Lite JSON
-- export Python, preferring normalized Altair when possible and falling back to `alt.Chart.from_dict(spec)`
+- export Python code, preferring normalized Altair when possible and falling back to `alt.Chart.from_dict(...)`
 
-The backend API is centered on chart sessions:
+The API remains available under `/api` for programmatic use.
+
+## Architecture
+
+Primary code paths:
+
+- [`vega_ui/app.py`](/home/alal/Desktop/code/viz/vega-ui/vega_ui/app.py): application factory, shared session store wiring, JSON API mounting, FastHTML UI mounting
+- [`vega_ui/ui.py`](/home/alal/Desktop/code/viz/vega-ui/vega_ui/ui.py): server-rendered editor pages, forms, preview rendering, redirect-based workflow
+- [`vega_ui/engine/ingestion.py`](/home/alal/Desktop/code/viz/vega-ui/vega_ui/engine/ingestion.py): validates incoming specs and normalizes supported charts
+- [`vega_ui/engine/provenance.py`](/home/alal/Desktop/code/viz/vega-ui/vega_ui/engine/provenance.py): stable editor metadata and export cleanup
+- [`vega_ui/engine/mutation.py`](/home/alal/Desktop/code/viz/vega-ui/vega_ui/engine/mutation.py): constrained presentation edits, layered annotation support, undo-safe mutation helpers
+- [`vega_ui/engine/codegen.py`](/home/alal/Desktop/code/viz/vega-ui/vega_ui/engine/codegen.py): JSON and Python export
+- [`vega_ui/routes/charts.py`](/home/alal/Desktop/code/viz/vega-ui/vega_ui/routes/charts.py): chart session API
+- [`vega_ui/routes/mutations.py`](/home/alal/Desktop/code/viz/vega-ui/vega_ui/routes/mutations.py): mutation, annotation, and undo API
+- [`vega_ui/routes/export.py`](/home/alal/Desktop/code/viz/vega-ui/vega_ui/routes/export.py): export API
+- [`tests`](/home/alal/Desktop/code/viz/vega-ui/tests): backend, API, mutation, provenance, validation, and UI tests
+
+Important implementation choices:
+
+- The FastHTML UI is mounted at `/`.
+- The JSON API stays under `/api/...`.
+- Session state is in memory and process-local.
+- Preview rendering is done on the server by converting the current Vega-Lite spec to SVG.
+- When annotations promote a chart to a layered spec, mark and axis mutations are applied to the base chart layer rather than the annotation layer.
+- Preview rendering failures are caught and shown in the page instead of crashing the request.
+
+## Install
+
+From the repo root:
+
+```bash
+uv sync
+```
+
+That installs the runtime and dev dependencies into the project environment managed by `uv`.
+
+## Run
+
+From the repo root:
+
+```bash
+uv run vega-ui
+```
+
+Equivalent direct entrypoint:
+
+```bash
+uv run python main.py
+```
+
+The app listens on `http://127.0.0.1:8000`.
+
+Runtime environment variables:
+
+- `HOST`: bind host for the uvicorn process
+- `PORT`: bind port for the uvicorn process
+- `VEGA_UI_RELOAD`: set to `1` or `true` to enable auto-reload for development
+- `VEGA_UI_BASE_PATH`: URL prefix for reverse-proxy deployments such as `/vega-ui`
+
+Once it is running:
+
+1. Open `http://127.0.0.1:8000`.
+2. Paste a Vega-Lite JSON spec or start from the sample spec shown on the page.
+3. Submit the loader form to create a session.
+4. Use the server-rendered forms to edit chart settings, marks, axes, annotations, undo, and exports.
+
+There is no separate frontend server and no build step required for local use.
+
+Example reverse-proxy launch for a prefixed deployment:
+
+```bash
+HOST=127.0.0.1 PORT=8756 VEGA_UI_BASE_PATH=/vega-ui uv run vega-ui
+```
+
+## API Surface
+
+Main endpoints:
 
 - `POST /api/charts`
 - `GET /api/charts/{session_id}`
@@ -34,109 +115,31 @@ The backend API is centered on chart sessions:
 - `POST /api/charts/{session_id}/annotations/remove`
 - `GET /api/charts/{session_id}/export/json`
 - `GET /api/charts/{session_id}/export/python`
+- `GET /health`
 
-Key backend files:
-
-- [`vega_ui/app.py`](/home/alal/Desktop/code/viz/vega-ui/vega_ui/app.py)
-- [`vega_ui/engine/ingestion.py`](/home/alal/Desktop/code/viz/vega-ui/vega_ui/engine/ingestion.py)
-- [`vega_ui/engine/validation.py`](/home/alal/Desktop/code/viz/vega-ui/vega_ui/engine/validation.py)
-- [`vega_ui/engine/provenance.py`](/home/alal/Desktop/code/viz/vega-ui/vega_ui/engine/provenance.py)
-- [`vega_ui/engine/mutation.py`](/home/alal/Desktop/code/viz/vega-ui/vega_ui/engine/mutation.py)
-- [`vega_ui/engine/codegen.py`](/home/alal/Desktop/code/viz/vega-ui/vega_ui/engine/codegen.py)
-- [`vega_ui/routes/charts.py`](/home/alal/Desktop/code/viz/vega-ui/vega_ui/routes/charts.py)
-- [`vega_ui/routes/mutations.py`](/home/alal/Desktop/code/viz/vega-ui/vega_ui/routes/mutations.py)
-- [`vega_ui/routes/export.py`](/home/alal/Desktop/code/viz/vega-ui/vega_ui/routes/export.py)
-
-Key frontend files:
-
-- [`frontend/src/main.ts`](/home/alal/Desktop/code/viz/vega-ui/frontend/src/main.ts)
-- [`frontend/src/renderer.ts`](/home/alal/Desktop/code/viz/vega-ui/frontend/src/renderer.ts)
-- [`frontend/src/selection.ts`](/home/alal/Desktop/code/viz/vega-ui/frontend/src/selection.ts)
-- [`frontend/src/state.ts`](/home/alal/Desktop/code/viz/vega-ui/frontend/src/state.ts)
-- [`frontend/src/panel/panel.ts`](/home/alal/Desktop/code/viz/vega-ui/frontend/src/panel/panel.ts)
-
-## Setup
-
-Python:
-
-```bash
-uv sync
-```
-
-Frontend:
-
-```bash
-cd frontend
-npm install
-```
-
-`frontend/node_modules` is intentionally ignored and should not be committed.
-
-## Run
-
-Backend only:
-
-```bash
-uv run vega-ui
-```
-
-or:
-
-```bash
-uv run python main.py
-```
-
-The backend runs on `127.0.0.1:8000`.
-
-If the frontend has not been built, visiting `/` on the backend returns a small message explaining how to start the UI.
-
-Frontend development server:
-
-```bash
-cd frontend
-npm run dev
-```
-
-Vite runs on `127.0.0.1:5173` and proxies `/api` to the backend.
-
-Built frontend served by FastAPI:
-
-```bash
-cd frontend
-npm run build
-```
-
-After that, restart the backend and it will serve `frontend/dist` at `/`.
+The FastHTML UI uses its own form posts for browser navigation, but it shares the same session store and mutation engine as the API.
 
 ## Test
 
-Backend:
+Run the Python test suite:
 
 ```bash
 uv run pytest
 ```
 
-Frontend:
+The suite covers:
 
-```bash
-cd frontend
-npm test
-```
+- ingestion and validation
+- provenance annotation
+- mutation helpers
+- API routes
+- export code generation
+- FastHTML UI smoke flows and layered annotation regression paths
 
-Optional frontend build verification:
+## Operational Notes
 
-```bash
-cd frontend
-npm run build
-```
-
-## Repository Hygiene
-
-The repository is intentionally centered on a single implementation now:
-
-- keep backend code in `vega_ui/`
-- keep frontend code in `frontend/`
-- keep Python tests in `tests/`
-- do not reintroduce alternate app stacks in parallel directories
-- keep `uv.lock` tracked
-- keep `frontend/node_modules` and `frontend/dist` untracked
+- This is a development-focused app. The session store is in-memory and not suitable for multi-process deployment.
+- FastHTML may create a local `.sesskey` file for session support; it is ignored by git.
+- `uv.lock` is tracked and should remain tracked.
+- If you extend the UI, keep business logic in the engine and route layers rather than embedding mutation rules in HTML handlers.
+- If you add new presentation edits, add both engine-level tests and route or UI regressions for them.

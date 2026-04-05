@@ -113,6 +113,38 @@ class TestMarkMutations:
         result = apply_mutation(spec, "mark.size", 100)
         assert result["mark"]["size"] == 100
 
+    def test_set_color_updates_constant_encoding_color(self):
+        spec = annotate_spec({
+            "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+            "data": {"values": [{"x": "A", "y": 1}]},
+            "mark": "bar",
+            "encoding": {
+                "x": {"field": "x", "type": "nominal"},
+                "y": {"field": "y", "type": "quantitative"},
+                "color": {"value": "#4c78a8"},
+            },
+        })
+
+        result = apply_mutation(spec, "mark.color", "#FFA500")
+
+        assert result["encoding"]["color"]["value"] == "#FFA500"
+        assert result.get("mark") == "bar"
+
+    def test_set_color_rejects_field_driven_color_encoding(self, line_spec):
+        spec = annotate_spec(line_spec)
+
+        with pytest.raises(MutationError, match="encoding.color.field"):
+            apply_mutation(spec, "mark.color", "#FFA500")
+
+    def test_set_color_on_layered_spec_updates_base_layer(self, bar_spec):
+        spec = annotate_spec(bar_spec)
+        layered, _ = add_annotation(spec, "Note", x_value="A", y_value=50)
+
+        result = apply_mutation(layered, "mark.color", "crimson")
+
+        assert result["layer"][0]["mark"]["color"] == "crimson"
+        assert result["layer"][1]["encoding"]["text"]["value"] == "Note"
+
 
 # ---------------------------------------------------------------------------
 # Axis mutations
