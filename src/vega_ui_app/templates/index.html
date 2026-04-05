@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }}</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Stage A MVP</p>
+        <h1>Vega UI</h1>
+      </div>
+      <p class="hero-copy">
+        A structure-first Vega-Lite editor for Altair users. Paste a spec, preview it as SVG,
+        edit supported presentation properties, and export a hardened `from_dict` fallback.
+      </p>
+    </header>
+
+    <main class="workspace">
+      <section class="control-column">
+        <section class="panel import-panel">
+          <div class="panel-heading">
+            <h2>Import Spec</h2>
+            <div class="button-row">
+              <button id="load-spec" class="button primary" type="button">Load Spec</button>
+              <button id="reset-example" class="button secondary" type="button">Restore Example</button>
+            </div>
+          </div>
+          <label class="field-label" for="spec-input">Paste Vega-Lite JSON</label>
+          <textarea id="spec-input" class="code-area input-area" spellcheck="false"></textarea>
+          <p class="panel-note">
+            This MVP edits a declared subset of Stage A charts. Unsupported structures stay preview-only.
+          </p>
+        </section>
+
+        <section class="panel">
+          <div class="panel-heading">
+            <h2>Support</h2>
+          </div>
+          <div id="support-banner" class="support-banner"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-heading">
+            <h2>Objects</h2>
+          </div>
+          <div id="object-list" class="object-list"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-heading">
+            <h2>Properties</h2>
+          </div>
+          <div id="property-editor" class="property-editor"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-heading">
+            <h2>Annotations</h2>
+          </div>
+          <div class="annotation-grid">
+            <form id="text-annotation-form" class="inline-form">
+              <h3>Text Annotation</h3>
+              <label class="field-label" for="text-annotation-text">Text</label>
+              <input id="text-annotation-text" name="text" type="text" value="Target" required>
+              <label class="field-label" for="text-annotation-x">X Value</label>
+              <input id="text-annotation-x" name="x" type="text" value="Q3" required>
+              <label class="field-label" for="text-annotation-y">Y Value</label>
+              <input id="text-annotation-y" name="y" type="text" value="188" required>
+              <label class="field-label" for="text-annotation-color">Color</label>
+              <input id="text-annotation-color" name="color" type="text" value="#d94841">
+              <label class="field-label" for="text-annotation-font-size">Font Size</label>
+              <input id="text-annotation-font-size" name="font_size" type="number" min="8" max="72" value="14">
+              <label class="field-label" for="text-annotation-align">Alignment</label>
+              <select id="text-annotation-align" name="align">
+                <option value="left">Left</option>
+                <option value="center">Center</option>
+                <option value="right">Right</option>
+              </select>
+              <button class="button secondary" type="submit">Add Text</button>
+            </form>
+
+            <form id="rule-annotation-form" class="inline-form">
+              <h3>Reference Line</h3>
+              <label class="field-label" for="rule-annotation-axis">Axis</label>
+              <select id="rule-annotation-axis" name="axis">
+                <option value="y">Horizontal (y)</option>
+                <option value="x">Vertical (x)</option>
+              </select>
+              <label class="field-label" for="rule-annotation-value">Value</label>
+              <input id="rule-annotation-value" name="value" type="text" value="180" required>
+              <label class="field-label" for="rule-annotation-label">Label</label>
+              <input id="rule-annotation-label" name="label" type="text" value="Goal line">
+              <label class="field-label" for="rule-annotation-color">Line Color</label>
+              <input id="rule-annotation-color" name="color" type="text" value="#d94841">
+              <label class="field-label" for="rule-annotation-stroke-width">Line Width</label>
+              <input id="rule-annotation-stroke-width" name="stroke_width" type="number" min="0.5" max="12" step="0.5" value="2">
+              <label class="field-label" for="rule-annotation-label-color">Label Color</label>
+              <input id="rule-annotation-label-color" name="label_color" type="text" value="#d94841">
+              <label class="field-label" for="rule-annotation-label-font-size">Label Font Size</label>
+              <input id="rule-annotation-label-font-size" name="label_font_size" type="number" min="8" max="72" value="12">
+              <button class="button secondary" type="submit">Add Rule</button>
+            </form>
+          </div>
+        </section>
+      </section>
+
+      <section class="preview-column">
+        <section class="panel preview-panel">
+          <div class="panel-heading">
+            <h2>Preview</h2>
+            <div id="feedback" class="feedback"></div>
+          </div>
+          <div class="preview-frame">
+            <img id="preview-image" alt="Rendered chart preview">
+          </div>
+        </section>
+
+        <section class="panel export-panel">
+          <div class="panel-heading">
+            <h2>Exports</h2>
+            <div class="button-row">
+              <button id="download-json" class="button secondary" type="button">Download JSON</button>
+              <button id="download-python" class="button secondary" type="button">Download Python</button>
+            </div>
+          </div>
+          <label class="field-label" for="spec-output">Normalized Vega-Lite JSON</label>
+          <textarea id="spec-output" class="code-area" readonly spellcheck="false"></textarea>
+          <label class="field-label" for="python-output">Python Fallback</label>
+          <textarea id="python-output" class="code-area" readonly spellcheck="false"></textarea>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="/static/app.js"></script>
+</body>
+</html>
