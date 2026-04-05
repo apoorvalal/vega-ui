@@ -143,3 +143,4 @@ The suite covers:
 - `uv.lock` is tracked and should remain tracked.
 - If you extend the UI, keep business logic in the engine and route layers rather than embedding mutation rules in HTML handlers.
 - If you add new presentation edits, add both engine-level tests and route or UI regressions for them.
+- For the `lalten.org/vega-ui` deployment, see [`DEPLOY.md`](/home/alal/Desktop/code/viz/vega-ui/DEPLOY.md).
