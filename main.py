@@ -1,5 +1,5 @@
-from vega_ui_app.cli import main
+from vega_ui.app import run
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    run()

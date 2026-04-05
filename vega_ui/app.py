@@ -42,6 +42,23 @@ def create_app() -> FastAPI:
     app.include_router(mutations.router)
     app.include_router(export.router)
 
+    @app.get("/health")
+    def health() -> dict[str, str]:
+        """Health endpoint for local verification."""
+        return {"status": "ok"}
+
+    if not FRONTEND_DIST.is_dir():
+        @app.get("/")
+        def root() -> dict[str, str]:
+            """Explain how to run the frontend when no build is present."""
+            return {
+                "message": (
+                    "Frontend build not found. Run `cd frontend && npm run dev` for local "
+                    "development, or `cd frontend && npm run build` and restart the backend "
+                    "to serve the built UI from FastAPI."
+                )
+            }
+
     # Serve frontend static files if built
     if FRONTEND_DIST.is_dir():
         app.mount("/", StaticFiles(directory=str(FRONTEND_DIST), html=True), name="frontend")
